@@ -35,6 +35,7 @@
              [permissions :as perms]
              [resolve-driver :as resolve-driver]
              [resolve-fields :as resolve-fields]
+             [resolve-joined-tables :as resolve-joined-tables]
              [results-metadata :as results-metadata]
              [source-table :as source-table]
              [store :as store]
@@ -99,6 +100,7 @@
       desugar/desugar
       annotate-and-sort/annotate-and-sort
       perms/check-query-permissions
+      resolve-joined-tables/resolve-joined-tables
       dev/check-results-format
       limit/limit
       cumulative-ags/handle-cumulative-aggregations

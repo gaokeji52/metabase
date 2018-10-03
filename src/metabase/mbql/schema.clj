@@ -474,6 +474,34 @@
     (set/rename-keys NativeQuery {:query :native})
     (s/recursive #'MBQLQuery)))
 
+(def JoinTableInfo
+  "Schema for information about a JOIN (or equivalent) that should be performed, and how to do it.. This is added
+  automatically by `resolve-joined-tables` middleware for `fk->` forms that are encountered."
+  { ;; The alias we should use for the table
+   :join-alias  su/NonBlankString
+   ;; ID of the Table to JOIN against. Table will be present in the QP store
+   :table-id    su/IntGreaterThanZero
+   ;; ID of the Field of the Query's SOURCE TABLE to use for the JOIN
+   ;; TODO - can `fk-field-id` and `pk-field-id` possibly be NAMES of FIELD LITERALS??
+   :fk-field-id su/IntGreaterThanZero
+   ;; ID of the Field on the Table we will JOIN (i.e., Table with `table-id`) to use for the JOIN
+   :pk-field-id su/IntGreaterThanZero})
+
+(def JoinQueryInfo
+  "Schema for information about about a JOIN (or equivalent) that should be performed using a recursive MBQL or native
+  query. "
+  {:join-alias su/NonBlankString
+   ;; TODO - put a proper schema in here once I figure out what it is. I think it's (s/recursive #'Query)?
+   :query      s/Any})
+
+(def JoinInfo
+  "Schema for information about a JOIN (or equivalent) that needs to be performed, either `JoinTableInfo` or
+  `JoinQueryInfo`."
+  (s/if :query
+    JoinQueryInfo
+    JoinTableInfo))
+
+
 (def MBQLQuery
   "Schema for a valid, normalized MBQL [inner] query."
   (s/constrained
@@ -490,6 +518,7 @@
                                     :items su/IntGreaterThanZero}
     ;; Various bits of middleware add additonal keys, such as `fields-is-implicit?`, to record bits of state or pass
     ;; info to other pieces of middleware. Everyone else can ignore them.
+    (s/optional-key :join-tables)  (s/constrained [JoinInfo] (partial apply distinct?) "distinct JoinInfo")
     s/Keyword                      s/Any}
    (fn [query]
      (core/= 1 (core/count (select-keys query [:source-query :source-table]))))

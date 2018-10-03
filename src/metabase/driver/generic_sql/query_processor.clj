@@ -21,7 +21,8 @@
              [date :as du]
              [honeysql-extensions :as hx]
              [i18n :refer [tru]]]
-            [schema.core :as s])
+            [schema.core :as s]
+            [metabase.mbql.schema :as mbql.s])
   (:import [java.sql PreparedStatement ResultSet ResultSetMetaData SQLException]
            [java.util Calendar Date TimeZone]
            metabase.models.field.FieldInstance))
@@ -119,7 +120,7 @@
 
 (defmethod ->honeysql [Object :fk->]
   [driver [_ _ dest-field-clause]]
-  (->honeysql dest-field-clause))
+  (->honeysql driver dest-field-clause))
 
 (defmethod ->honeysql [Object :field-literal]
   [driver [_ field-name]]
@@ -317,29 +318,28 @@
 (defn- make-honeysql-join-clauses
   "Returns a seq of honeysql join clauses, joining to `table-or-query-expr`. `jt-or-jq` can be either a `JoinTable` or
   a `JoinQuery`"
-  [table-or-query-expr {:keys [table-name pk-field source-field schema join-alias] :as jt-or-jq}]
+  [table-or-query-expr {:keys [join-alias fk-field-id pk-field-id]}]
   (let [source-table-id                                  (mbql.u/query->source-table-id *query*)
-        {source-table-name :name, source-schema :schema} (qp.store/table source-table-id)]
+        {source-table-name :name, source-schema :schema} (qp.store/table source-table-id)
+        source-field                                     (qp.store/field fk-field-id)
+        pk-field                                         (qp.store/field pk-field-id)]
     [[table-or-query-expr (keyword join-alias)]
      [:=
-      (hx/qualify-and-escape-dots source-schema source-table-name (:field-name source-field))
-      (hx/qualify-and-escape-dots join-alias (:field-name pk-field))]]))
+      (hx/qualify-and-escape-dots source-schema source-table-name (:name source-field))
+      (hx/qualify-and-escape-dots join-alias (:name pk-field))]]))
 
-#_(defmethod ->honeysql [Object JoinTable]
-  ;; Returns a seq of clauses used in a honeysql join clause
-  [driver {:keys [schema table-name] :as jt} ]
-  (make-honeysql-join-clauses (hx/qualify-and-escape-dots schema table-name) jt))
-
-#_(defmethod ->honeysql [Object JoinQuery]
-  ;; Returns a seq of clauses used in a honeysql join clause
-  [driver {:keys [query] :as jq}]
-  (make-honeysql-join-clauses (build-honeysql-form driver query) jq))
+(s/defn ^:private join-info->honeysql
+  [driver , {:keys [query table-id], :as info} :- mbql.s/JoinInfo]
+  (if query
+    (make-honeysql-join-clauses (build-honeysql-form driver query) info)
+    (let [table (qp.store/table table-id)]
+      (make-honeysql-join-clauses (hx/qualify-and-escape-dots (:schema table) (:name table)) info))))
 
 (defn apply-join-tables
   "Apply expanded query `join-tables` clause to `honeysql-form`. Default implementation of `apply-join-tables` for SQL
   drivers."
   [driver honeysql-form {:keys [join-tables]}]
-  (reduce (partial apply h/merge-left-join) honeysql-form (map #(->honeysql driver %) join-tables)))
+  (reduce (partial apply h/merge-left-join) honeysql-form (map (partial join-info->honeysql driver) join-tables)))
 
 
 ;;; ---------------------------------------------------- order-by ----------------------------------------------------
@@ -440,9 +440,9 @@
   "Transpile MBQL query into a native SQL statement."
   [driver {inner-query :query, database :database, :as outer-query}]
   (binding [*query* outer-query]
-    (println "QUERY:" (u/pprint-to-str 'magenta outer-query)) ; NOCOMMIT
+    (when-not (:quiet environ.core/env) (println "QUERY:" (u/pprint-to-str 'magenta outer-query))) ; NOCOMMIT
     (let [honeysql-form (build-honeysql-form driver outer-query)
-          _              (println "HoneySQL:" (u/pprint-to-str 'yellow honeysql-form)) ; NOCOMMIT
+          _              (when-not (:quiet environ.core/env) (println "HoneySQL:" (u/pprint-to-str 'yellow honeysql-form))) ; NOCOMMIT
           [sql & args]  (sql/honeysql-form->sql+args driver honeysql-form)]
       {:query  sql
        :params args})))
@@ -645,7 +645,7 @@
   "Process and run a native (raw SQL) QUERY."
   [driver {settings :settings, database-id :database, query :native, :as outer-query}]
   (let [query (assoc query :remark (qputil/query->remark outer-query))]
-    (println "NATIVE QUERY:" (u/pprint-to-str 'blue query)) ; NOCOMMIT
+    (when-not (:quiet environ.core/env) (println "NATIVE QUERY:" (u/pprint-to-str 'blue query))) ; NOCOMMIT
     (do-with-try-catch
       (fn []
         (let [db-connection (sql/db->jdbc-connection-spec (Database (u/get-id database-id)))]

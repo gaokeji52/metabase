@@ -1,6 +1,8 @@
 (ns metabase.query-processor.middleware.cumulative-aggregations
   "Middlware for handling cumulative count and cumulative sum aggregations."
-  (:require [metabase.mbql.util :as mbql.u]))
+  (:require [metabase.mbql.util :as mbql.u]
+            [schema.core :as s]
+            [metabase.mbql.schema :as mbql.s]))
 
 (defn- diff-indecies
   "Given two sequential collections, return indecies that are different between the two."
@@ -12,14 +14,14 @@
        (filter identity)
        set))
 
-(defn- replace-cumulative-ags
+(s/defn ^:private replace-cumulative-ags :- mbql.s/Query
   "Replace `cum-count` and `cum-sum` aggregations in `query` with `count` and `sum` aggregations, respectively."
   [query]
   (mbql.u/replace-clauses-in query [:query :aggregation] #{:cum-count :cum-sum}
     (fn [[ag-type ag-field]]
       [(case ag-type
          :cum-sum   :sum
-         :cum-count :count) :ag-field])))
+         :cum-count :count) ag-field])))
 
 (defn- add-rows
   "Update values in `row` by adding values from `last-row` for a set of specified indexes.
@@ -39,15 +41,15 @@
               (first rows)
               (rest rows)))
 
-(defn handle-cumulate-aggregations
+(defn handle-cumulative-aggregations
   "Middleware that implements `cum-count` and `cum-sum` aggregations. These clauses are replaced with `count` and `sum`
   clauses respectively and summation is performed on results in Clojure-land."
   [qp]
   (fn [{{aggregations :aggregation} :query, :as query}]
-    (if-let [cumulative-aggregations (seq  (mbql.u/clause-instances #{:cum-count :cum-sum} aggregations))]
+    (if (seq (mbql.u/clause-instances #{:cum-count :cum-sum} aggregations))
       (let [new-query        (replace-cumulative-ags query)
             replaced-indexes (diff-indecies (->     query :query :aggregation)
                                             (-> new-query :query :aggregation))
             results          (qp new-query)]
         (update results :rows (partial sum-rows replaced-indexes)))
-      query)))
+      (qp query))))

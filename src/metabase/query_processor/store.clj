@@ -40,6 +40,12 @@
 
 ;; TODO - DATABASE ??
 
+(def table-columns-to-fetch
+  "Columns you should fetch for any Table you want to stash in the Store."
+  [:schema
+   :name
+   :id])
+
 (def ^:private TableInstanceWithRequiredStoreKeys
   (s/both
    (class Table)
@@ -47,6 +53,25 @@
     :schema (s/maybe s/Str)
     :name   su/NonBlankString
     s/Any s/Any}))
+
+
+(def field-columns-to-fetch
+  "Columns to fetch for and Field you want to stash in the Store. These get returned as part of the `:cols` metadata in
+  query results. Try to keep this set pared down to just what's needed by the QP and frontend, since it has to be done
+  for every MBQL query."
+  [:base_type
+   :database_type
+   :description
+   :display_name
+   :fingerprint
+   #_:fk_target_field_id
+   :id
+   :name
+   :parent_id
+   #_:settings
+   :special_type
+   :table_id
+   :visibility_type])
 
 (def ^:private FieldInstanceWithRequiredStorekeys
   (s/both
