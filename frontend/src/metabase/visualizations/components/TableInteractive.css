@@ -92,3 +92,10 @@
   background-color: var(--color-brand);
   color: white !important;
 }
+.TableInteractive-emptyCell {
+  background-color: var(--color-bg-light);
+}
+
+.TableInteractive-cellWrapper:hover {
+  background-color: color(var(--color-brand) alpha(-90%));
+}

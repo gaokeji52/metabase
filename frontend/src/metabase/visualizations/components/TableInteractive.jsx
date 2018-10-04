@@ -349,6 +349,7 @@ export default class TableInteractive extends Component {
           "TableInteractive-cellWrapper--firstColumn": columnIndex === 0,
           "TableInteractive-cellWrapper--lastColumn":
             columnIndex === cols.length - 1,
+          "TableInteractive-emptyCell": value == null,
           "cursor-pointer": isClickable,
           "justify-end": isColumnRightAligned(column),
           link: isClickable && isID(column),
