@@ -345,17 +345,14 @@ export default class TableInteractive extends Component {
           transition: dragColIndex != null ? "left 200ms" : null,
           backgroundColor,
         }}
-        className={cx(
-          "TableInteractive-cellWrapper text-medium text-dark-hover",
-          {
-            "TableInteractive-cellWrapper--firstColumn": columnIndex === 0,
-            "TableInteractive-cellWrapper--lastColumn":
-              columnIndex === cols.length - 1,
-            "cursor-pointer": isClickable,
-            "justify-end": isColumnRightAligned(column),
-            link: isClickable && isID(column),
-          },
-        )}
+        className={cx("TableInteractive-cellWrapper text-dark", {
+          "TableInteractive-cellWrapper--firstColumn": columnIndex === 0,
+          "TableInteractive-cellWrapper--lastColumn":
+            columnIndex === cols.length - 1,
+          "cursor-pointer": isClickable,
+          "justify-end": isColumnRightAligned(column),
+          link: isClickable && isID(column),
+        })}
         onMouseUp={
           isClickable
             ? e => {
